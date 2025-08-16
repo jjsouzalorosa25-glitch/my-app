@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prevision.com - Análise de IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            padding: 20px;
+            position: relative;
+            z-index: 0;
+            gap: 40px;
+        }
+        
+        /* Full-screen canvas for background animation */
+        #chartCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+        }
+
+        .main-content {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 1;
+            align-items: center;
+        }
+
+        .camera-section, .info-section, .buttons-section {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        #cameraContainer {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(137, 87, 229, 0.2);
+            background-color: rgba(10, 10, 10, 0.5);
+            border: 2px solid #30363d;
+            overflow: hidden;
+        }
+
+        video, #photoPreview {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        #photoPreview {
+            display: none;
+        }
+
+        .buttons-section {
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 9999px;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+            font-size: 1rem;
+            border: 1px solid transparent;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-green {
+            background-image: linear-gradient(45deg, #2ea043, #5be580);
+            box-shadow: 0 0 15px #2ea043, inset 0 0 10px #2ea043;
+        }
+
+        .btn-red {
+            background-image: linear-gradient(45deg, #da3633, #e55b5b);
+            box-shadow: 0 0 15px #da3633, inset 0 0 10px #da3633;
+        }
+
+        .btn-purple {
+            background-image: linear-gradient(45deg, #8957e5, #b485ff);
+            box-shadow: 0 0 15px #8957e5, inset 0 0 10px #8957e5;
+        }
+        
+        .btn-analyze {
+            background-color: #5be580;
+            animation: glow 1.5s infinite alternate;
+        }
+
+        .info-text {
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: transparent;
+        }
+
+        .call-signal { 
+            color: #5be580;
+            text-shadow: 0 0 10px #5be580;
+        }
+        .put-signal { 
+            color: #e55b5b;
+            text-shadow: 0 0 10px #e55b5b;
+        }
+
+        .prevision-text {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #8b949e;
+            text-align: center;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px rgba(139, 148, 158, 0.5);
+            margin-top: 20px;
+            z-index: 1;
+            animation: pulse 2s infinite alternate;
+        }
+
+        #messageBox {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #21262d;
+            color: #c9d1d9;
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            display: none;
+        }
+
+        @keyframes pulse {
+            from { text-shadow: 0 0 10px rgba(139, 148, 158, 0.5); }
+            to { text-shadow: 0 0 20px rgba(139, 148, 158, 0.8), 0 0 30px rgba(139, 148, 158, 0.5); }
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 10px #5be580, 0 0 20px #5be580; }
+            to { box-shadow: 0 0 20px #5be580, 0 0 30px #5be580; }
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="chartCanvas"></canvas>
+
+<div class="main-content">
+    <div class="info-section">
+        <p class="info-text">
+            Sinal da IA: <span id="aiSignal">Aguardando...</span>
+            <span id="confidence" style="display:none;"></span>
+        </p>
+    </div>
+
+    <div class="camera-section">
+        <div id="cameraContainer">
+            <video id="webcamVideo" autoplay playsinline></video>
+            <img id="photoPreview" alt="Foto para análise">
+        </div>
+        <canvas id="photoCanvas" style="display:none;"></canvas>
+        <div class="buttons-section">
+            <button id="startButton" class="btn btn-purple">Ligar Câmera</button>
+            <button id="captureButton" class="btn btn-purple" disabled>Tirar Foto</button>
+            <label for="galleryInput" class="btn btn-purple cursor-pointer">Escolher da Galeria</label>
+            <input type="file" id="galleryInput" accept="image/*" style="display:none;">
+            <button id="analyzeButton" class="btn btn-analyze" style="display:none;">ANALISAR</button>
+        </div>
+    </div>
+    
+    <div class="buttons-section">
+        <button id="callButton" class="btn btn-green" disabled>WIN (CALL)</button>
+        <button id="putButton" class="btn btn-red" disabled>LOSS (PUT)</button>
+    </div>
+
+    <div class="info-section">
+        <p class="info-text">
+            Feedback do Usuário: <span id="userFeedback">0 wins / 0 losses</span>
+        </p>
+        <p class="info-text">
+            Assertividade da IA: <span id="accuracy">0.00%</span>
+        </p>
+    </div>
+</div>
+
+<div class="prevision-text">prevision.com</div>
+
+<div id="messageBox"></div>
+
+<script>
+    // --- Animação de Fundo com Gráfico de Candlestick ---
+    const chartCanvas = document.getElementById('chartCanvas');
+    const ctx = chartCanvas.getContext('2d');
+    const candles = [];
+    const maxCandles = 50;
+    const candleWidth = 10;
+    const scrollSpeed = 0.5;
+
+    // Ajusta o tamanho do canvas ao redimensionar a janela
+    const resizeCanvas = () => {
+        chartCanvas.width = window.innerWidth;
+        chartCanvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Gera um novo candle aleatório
+    function generateCandle() {
+        const x = chartCanvas.width + Math.random() * 200;
+        const y = Math.random() * chartCanvas.height * 0.8 + chartCanvas.height * 0.1;
+        const open = y;
+        const close = y + (Math.random() - 0.5) * 50;
+        const high = Math.max(open, close) + Math.random() * 20;
+        const low = Math.min(open, close) - Math.random() * 20;
+        const color = close > open ? '#2ea043' : '#da3633';
+        return { x, open, close, high, low, color };
+    }
+
+    // Desenha um único candle
+    function drawCandle(candle) {
+        ctx.beginPath();
+        ctx.moveTo(candle.x + candleWidth / 2, candle.high);
+        ctx.lineTo(candle.x + candleWidth / 2, candle.low);
+        ctx.strokeStyle = candle.color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        const bodyHeight = Math.abs(candle.close - candle.open);
+        const y = Math.min(candle.open, candle.close);
+        ctx.fillStyle = candle.color;
+        ctx.fillRect(candle.x, y, candleWidth, bodyHeight);
+    }
+
+    // Loop de animação principal do fundo
+    function animateCandles() {
+        ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+        
+        for (let i = candles.length - 1; i >= 0; i--) {
+            candles[i].x -= scrollSpeed;
+            if (candles[i].x < -candleWidth) {
+                candles.splice(i, 1);
+            }
+        }
+        
+        if (candles.length < maxCandles) {
+            candles.push(generateCandle());
+        }
+        
+        candles.forEach(drawCandle);
+
+        requestAnimationFrame(animateCandles);
+    }
+    
+    // Inicia a animação ao carregar a página
+    window.onload = function() {
+        animateCandles();
+    };
+
+    // --- Funcionalidade da Câmera e Galeria ---
+    const webcamVideo = document.getElementById('webcamVideo');
+    const photoPreview = document.getElementById('photoPreview');
+    const photoCanvas = document.getElementById('photoCanvas');
+    const startButton = document.getElementById('startButton');
+    const captureButton = document.getElementById('captureButton');
+    const galleryInput = document.getElementById('galleryInput');
+    const analyzeButton = document.getElementById('analyzeButton');
+    const aiSignalSpan = document.getElementById('aiSignal');
+    const confidenceSpan = document.getElementById('confidence');
+
+    let stream = null;
+    let imageDataToAnalyze = null;
+    
+    // Exibe uma mensagem na tela
+    function showMessage(message, duration = 3000) {
+        const messageBox = document.getElementById('messageBox');
+        messageBox.textContent = message;
+        messageBox.style.display = 'block';
+        setTimeout(() => {
+            messageBox.style.display = 'none';
+        }, duration);
+    }
+
+    // Liga a câmera
+    startButton.addEventListener('click', async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            webcamVideo.srcObject = stream;
+            webcamVideo.style.display = 'block';
+            photoPreview.style.display = 'none';
+            captureButton.disabled = false;
+            startButton.textContent = 'Câmera Ativada';
+            startButton.disabled = true;
+            analyzeButton.style.display = 'none';
+            showMessage("Câmera ligada!");
+        } catch (err) {
+            console.error("Erro ao acessar a câmera: ", err);
+            showMessage("Erro: Não foi possível acessar a câmera.");
+        }
+    });
+
+    // Tira uma foto da câmera
+    captureButton.addEventListener('click', () => {
+        if (stream) {
+            photoCanvas.width = webcamVideo.videoWidth;
+            photoCanvas.height = webcamVideo.videoHeight;
+            const context = photoCanvas.getContext('2d');
+            context.drawImage(webcamVideo, 0, 0, photoCanvas.width, photoCanvas.height);
+            
+            imageDataToAnalyze = photoCanvas.toDataURL('image/png');
+            photoPreview.src = imageDataToAnalyze;
+
+            webcamVideo.style.display = 'none';
+            photoPreview.style.display = 'block';
+            analyzeButton.style.display = 'block';
+            showMessage("Foto tirada! Clique em ANALISAR para continuar.");
+        } else {
+            showMessage("Por favor, ligue a câmera primeiro.");
+        }
+    });
+
+    // Lida com a seleção de imagem da galeria
+    galleryInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    photoCanvas.width = img.width;
+                    photoCanvas.height = img.height;
+                    const context = photoCanvas.getContext('2d');
+                    context.drawImage(img, 0, 0, photoCanvas.width, photoCanvas.height);
+                    
+                    imageDataToAnalyze = photoCanvas.toDataURL('image/png');
+                    photoPreview.src = imageDataToAnalyze;
+
+                    webcamVideo.style.display = 'none';
+                    photoPreview.style.display = 'block';
+                    analyzeButton.style.display = 'block';
+                    showMessage("Imagem carregada! Clique em ANALISAR para continuar.");
+                }
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // --- Integração com o Backend ---
+    const callButton = document.getElementById('callButton');
+    const putButton = document.getElementById('putButton');
+    const userFeedbackSpan = document.getElementById('userFeedback');
+    const accuracySpan = document.getElementById('accuracy');
+    
+    let totalWins = 0;
+    let totalLosses = 0;
+    let currentPrediction = '';
+
+    // Aciona a análise da IA via chamada de API para o backend
+    analyzeButton.addEventListener('click', async () => {
+        if (imageDataToAnalyze) {
+            aiSignalSpan.textContent = 'Analisando...';
+            aiSignalSpan.className = 'info-text';
+            confidenceSpan.style.display = 'none';
+            analyzeButton.style.display = 'none';
+
+            try {
+                // Requisição fetch para o seu backend Python
+                const response = await fetch('http://localhost:5000/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image: imageDataToAnalyze }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erro de rede ou do servidor.');
+                }
+
+                const data = await response.json();
+                
+                // Atualiza a UI com a previsão real da IA
+                currentPrediction = data.signal;
+                const confidence = data.confidence;
+                
+                aiSignalSpan.textContent = currentPrediction;
+                aiSignalSpan.className = currentPrediction === 'CALL' ? 'call-signal' : 'put-signal';
+                confidenceSpan.textContent = ` (${confidence}%)`;
+                confidenceSpan.style.display = 'inline';
+                
+                callButton.disabled = false;
+                putButton.disabled = false;
+
+            } catch (error) {
+                console.error("Erro ao analisar a imagem:", error);
+                showMessage("Erro na análise. Verifique se o servidor Python está rodando.");
+                aiSignalSpan.textContent = 'Erro';
+                aiSignalSpan.className = 'info-text';
+            }
+        } else {
+            showMessage("Por favor, capture ou escolha uma foto primeiro.");
+        }
+    });
+
+    // Lida com o feedback do usuário (botão WIN/CALL)
+    callButton.addEventListener('click', () => {
+        if (currentPrediction === 'CALL') {
+            totalWins++;
+            showMessage("Acerto! Feedback enviado para a IA.");
+        } else {
+            totalLosses++;
+            showMessage("Erro. Feedback enviado para a IA.");
+        }
+        updateFeedbackUI();
+        disableFeedbackButtons();
+    });
+
+    // Lida com o feedback do usuário (botão LOSS/PUT)
+    putButton.addEventListener('click', () => {
+        if (currentPrediction === 'PUT') {
+            totalWins++;
+            showMessage("Acerto! Feedback enviado para a IA.");
+        } else {
+            totalLosses++;
+            showMessage("Erro. Feedback enviado para a IA.");
+        }
+        updateFeedbackUI();
+        disableFeedbackButtons();
+    });
+
+    // Atualiza a UI com as métricas de feedback
+    function updateFeedbackUI() {
+        userFeedbackSpan.textContent = `${totalWins} wins / ${totalLosses} losses`;
+        const totalAttempts = totalWins + totalLosses;
+        if (totalAttempts > 0) {
+            const accuracy = (totalWins / totalAttempts) * 100;
+            accuracySpan.textContent = `${accuracy.toFixed(2)}%`;
+        } else {
+            accuracySpan.textContent = '0.00%';
+        }
+    }
+
+    // Desabilita os botões de feedback
+    function disableFeedbackButtons() {
+        callButton.disabled = true;
+        putButton.disabled = true;
+    }
+</script>
+
+</body>
+</html>
